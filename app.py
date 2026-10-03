@@ -3,282 +3,434 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import IsolationForest
 import plotly.graph_objects as go
+import plotly.express as px
+
+# ============================================================
+# SENTINEL-X — Cyber AI Hackathon 2026
+# Safe, synthetic defensive-security demonstration
+# ============================================================
 
 st.set_page_config(
-    page_title="SENTINEL-X | Cyber AI",
+    page_title="SENTINEL-X | Adaptive Cyber AI",
     page_icon="🛡️",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
-# ---------- Styling ----------
+# ----------------------------- CSS ----------------------------
 st.markdown("""
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
+}
 .stApp {
-    background: radial-gradient(circle at 15% 10%, #102448 0%, #070d1c 38%, #050912 100%);
-    color: #eef5ff;
+    background:
+      radial-gradient(circle at 8% 0%, rgba(0,229,255,.10), transparent 28%),
+      radial-gradient(circle at 100% 15%, rgba(93,82,255,.10), transparent 30%),
+      #050914;
+    color: #edf5ff;
 }
-.block-container {padding-top: 1.4rem; max-width: 1400px;}
+.block-container { max-width: 1500px; padding-top: 1.0rem; }
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg,#071124,#050914);
+    border-right: 1px solid #182d4e;
+}
 .hero {
-    padding: 22px 26px;
-    border: 1px solid #203b67;
-    border-radius: 18px;
-    background: linear-gradient(135deg, rgba(11,28,57,.96), rgba(9,16,34,.96));
-    box-shadow: 0 12px 40px rgba(0,0,0,.25);
+    border: 1px solid #21436f;
+    border-radius: 22px;
+    padding: 25px 30px;
+    background: linear-gradient(115deg, rgba(10,28,58,.96), rgba(8,14,29,.92));
+    box-shadow: 0 20px 70px rgba(0,0,0,.28);
 }
-.kicker {color:#00e5ff; font-size:13px; font-weight:700; letter-spacing:2px;}
-.hero h1 {font-size:42px; margin:4px 0 2px; color:#f5f8ff;}
-.hero p {color:#b9cbe7; font-size:16px; margin:0;}
-.metric {
-    background:#0d1b35; border:1px solid #213b66; border-radius:14px;
-    padding:16px; min-height:112px;
+.hero-kicker { color:#00e5ff; font-size:12px; font-weight:800; letter-spacing:2.2px; }
+.hero-title { font-size:42px; line-height:1.05; font-weight:800; margin:7px 0 7px; }
+.hero-sub { color:#a9bfde; font-size:15px; }
+.pill {
+    display:inline-block; padding:5px 10px; border-radius:999px;
+    background:#0c2947; border:1px solid #1d507b; color:#74eaff;
+    font-size:11px; font-weight:700; margin-right:6px;
 }
-.metric .label {color:#8ea9cf; font-size:12px; text-transform:uppercase; letter-spacing:1px;}
-.metric .value {font-size:30px; font-weight:800; margin-top:5px;}
-.panel {
-    background:#0b1730; border:1px solid #203b67; border-radius:16px; padding:18px;
+.card {
+    background: linear-gradient(145deg,#0a1831,#081224);
+    border:1px solid #1c365b; border-radius:17px; padding:18px;
+    box-shadow: 0 10px 35px rgba(0,0,0,.15);
 }
-.small {color:#9fb5d7; font-size:13px;}
-.status-high {color:#ff4c5b; font-weight:800;}
-.status-normal {color:#30e19a; font-weight:800;}
-.evidence {padding:9px 12px; margin:6px 0; background:#101f3d; border-radius:9px; color:#dbe8fb;}
+.card-title { color:#a9bfde; text-transform:uppercase; letter-spacing:1.2px;
+    font-size:11px; font-weight:700; }
+.metric-value { font-size:30px; font-weight:800; margin-top:5px; }
+.metric-delta { font-size:12px; color:#65e6b0; }
+.metric-delta-warn { font-size:12px; color:#ff7380; }
+.section-title { font-size:22px; font-weight:800; margin:5px 0 3px; }
+.muted { color:#829bbd; font-size:12px; }
+.alert {
+    border-radius:14px; padding:14px 16px; margin:5px 0;
+    border:1px solid #6d2533; background:rgba(108,25,43,.25);
+}
+.alert-title { color:#ff6f7d; font-weight:800; }
+.ok {
+    border-radius:14px; padding:14px 16px; margin:5px 0;
+    border:1px solid #185a4a; background:rgba(20,115,88,.16);
+}
+.ok-title { color:#5fe5ae; font-weight:800; }
+.step {
+    padding:13px 15px; border-radius:12px; background:#0c1b35;
+    border:1px solid #1b3558; min-height:80px;
+}
+.step-num { color:#00e5ff; font-weight:800; font-size:12px; }
+.step-name { font-weight:700; margin-top:4px; }
+.step-desc { color:#8ea8c8; font-size:11px; margin-top:3px; }
 div.stButton > button {
-    width:100%; border-radius:10px; font-weight:700; min-height:45px;
+    border-radius:11px; min-height:42px; font-weight:700;
+    border:1px solid #24476f;
+}
+div[data-testid="stMetric"] {
+    background:#0a1831; border:1px solid #1c365b; border-radius:14px; padding:12px;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# ---------- Baseline + model ----------
-rng = np.random.default_rng(42)
-normal_train = pd.DataFrame({
-    "outbound_mb": rng.normal(18, 3, 600).clip(5),
-    "connections": rng.normal(38, 7, 600).clip(5),
-    "new_destinations": rng.poisson(1, 600),
-    "login_events": rng.normal(7, 2, 600).clip(0),
-})
+# ------------------------- Model ------------------------------
+rng = np.random.default_rng(7)
 features = ["outbound_mb", "connections", "new_destinations", "login_events"]
 
+normal_train = pd.DataFrame({
+    "outbound_mb": rng.normal(18, 3, 1000).clip(4),
+    "connections": rng.normal(40, 7, 1000).clip(5),
+    "new_destinations": rng.poisson(1, 1000),
+    "login_events": rng.normal(7, 2, 1000).clip(0),
+})
+
 model = IsolationForest(
-    n_estimators=180,
-    contamination=0.04,
-    random_state=42
+    n_estimators=250,
+    contamination=0.035,
+    random_state=7
 )
 model.fit(normal_train[features])
+baseline = normal_train[features].median()
 
-baseline = normal_train[features].mean()
-
-def get_event(simulated=False):
-    if simulated:
+def safe_event(incident=False):
+    if incident:
         return {
-            "outbound_mb": float(rng.normal(66, 5)),
-            "connections": float(rng.normal(92, 10)),
-            "new_destinations": int(rng.integers(6, 11)),
-            "login_events": float(rng.normal(17, 3)),
-            "device_changed": True,
+            "outbound_mb": float(rng.normal(82, 7)),
+            "connections": float(rng.normal(108, 11)),
+            "new_destinations": int(rng.integers(7, 12)),
+            "login_events": float(rng.normal(20, 3)),
+            "new_device": True,
+            "geo_shift": True,
         }
     return {
-        "outbound_mb": float(rng.normal(18, 2.2)),
-        "connections": float(rng.normal(38, 5)),
+        "outbound_mb": float(rng.normal(18, 2.5)),
+        "connections": float(rng.normal(40, 5)),
         "new_destinations": int(rng.integers(0, 3)),
-        "login_events": float(rng.normal(7, 1.4)),
-        "device_changed": False,
+        "login_events": float(rng.normal(7, 1.5)),
+        "new_device": False,
+        "geo_shift": False,
     }
 
-def score_event(event):
-    x = pd.DataFrame([event])[features]
-    decision = model.decision_function(x)[0]
-    # Convert Isolation Forest decision into an easy-to-read anomaly percentage.
-    anomaly = float(np.clip(50 - decision * 55, 1, 99))
+def analyze(e):
+    x = pd.DataFrame([e])[features]
+    raw = model.decision_function(x)[0]
+    anomaly = float(np.clip(50 - raw * 58, 1, 99))
 
-    volume_ratio = event["outbound_mb"] / max(baseline["outbound_mb"], 1)
-    connection_ratio = event["connections"] / max(baseline["connections"], 1)
-
+    volume = e["outbound_mb"] / max(baseline["outbound_mb"], 1)
+    conn = e["connections"] / max(baseline["connections"], 1)
     context = 0
-    if event["device_changed"]:
+    reasons = []
+
+    if volume > 2.5:
+        context += 27
+        reasons.append(f"Outbound volume is {volume:.1f}× above the learned baseline.")
+    if conn > 2:
+        context += 22
+        reasons.append(f"Connection burst is {conn:.1f}× above the learned baseline.")
+    if e["new_destinations"] >= 4:
         context += 24
-    if event["new_destinations"] >= 4:
-        context += 28
-    if volume_ratio >= 2.5:
-        context += 25
-    if connection_ratio >= 2:
-        context += 20
-    context = min(context, 100)
+        reasons.append("Destination novelty is outside the learned behavioural profile.")
+    if e["new_device"]:
+        context += 15
+        reasons.append("A new device context is associated with the session.")
+    if e["geo_shift"]:
+        context += 12
+        reasons.append("A geographic context shift increases the risk signal.")
 
-    threat_confidence = float(np.clip(
-        12 + anomaly * 0.42 + context * 0.38, 0, 99
-    ))
-    risk = float(np.clip(
-        anomaly * 0.50 + threat_confidence * 0.25 + context * 0.25, 0, 100
-    ))
+    if not reasons:
+        reasons = [
+            "Traffic volume is consistent with the learned baseline.",
+            "Destination novelty is within the expected range.",
+            "Identity/device context is consistent with the profile.",
+        ]
 
-    return anomaly, threat_confidence, context, risk, volume_ratio, connection_ratio
+    confidence = float(np.clip(10 + anomaly*.48 + context*.32, 0, 99))
+    risk = float(np.clip(anomaly*.52 + confidence*.25 + context*.23, 0, 100))
 
-# ---------- Session state ----------
-if "simulated" not in st.session_state:
-    st.session_state.simulated = False
+    return risk, anomaly, confidence, reasons, volume, conn
+
+# ------------------------- State ------------------------------
+if "incident" not in st.session_state:
+    st.session_state.incident = False
+if "events" not in st.session_state:
+    st.session_state.events = 0
 if "history" not in st.session_state:
-    st.session_state.history = [12, 11, 13, 10, 12, 11]
+    st.session_state.history = [10,12,11,13,12,14,11]
+if "last_risk" not in st.session_state:
+    st.session_state.last_risk = 12
 
-# ---------- Header ----------
+# ------------------------- Sidebar ----------------------------
+with st.sidebar:
+    st.markdown("## 🛡️ SENTINEL-X")
+    st.caption("Adaptive behavioural defence")
+    st.markdown("---")
+    st.markdown("**DEMO CONTROLS**")
+    if st.button("⚡ Trigger synthetic anomaly", use_container_width=True):
+        st.session_state.incident = True
+        st.session_state.events += 1
+        st.session_state.history += [22, 36, 51, 68, 84, 91]
+        st.session_state.last_risk = 91
+        st.rerun()
+    if st.button("↺ Return to normal", use_container_width=True):
+        st.session_state.incident = False
+        st.session_state.events += 1
+        st.session_state.history = [10,12,11,13,12,14,11]
+        st.session_state.last_risk = 12
+        st.rerun()
+    st.markdown("---")
+    st.markdown("**ENGINE STATUS**")
+    st.success("AI detector online")
+    st.success("Behaviour baseline loaded")
+    st.success("Explainability engine online")
+    st.markdown("---")
+    st.caption("All telemetry shown in this MVP is synthetic. No external systems are attacked or modified.")
+
+# ------------------------- Header ------------------------------
 st.markdown("""
 <div class="hero">
-  <div class="kicker">CYBER AI HACKATHON 2026 • DEFENSIVE SECURITY MVP</div>
-  <h1>🛡️ SENTINEL-X</h1>
-  <p>Adaptive AI detection for previously unseen behavioural anomalies in cloud networks</p>
+  <div class="hero-kicker">CYBER AI HACKATHON 2026 • DEFENSIVE SECURITY • MVP</div>
+  <div class="hero-title">🛡️ SENTINEL-X</div>
+  <div class="hero-sub">
+    Adaptive AI that learns normal behaviour and surfaces previously unseen anomalies
+    before they become high-impact incidents.
+  </div>
+  <div style="margin-top:13px">
+    <span class="pill">ANOMALY DETECTION</span>
+    <span class="pill">EXPLAINABLE AI</span>
+    <span class="pill">CLOUD TELEMETRY</span>
+    <span class="pill">HUMAN-IN-THE-LOOP</span>
+  </div>
 </div>
 """, unsafe_allow_html=True)
 
 st.write("")
 
-# ---------- Controls ----------
-c1, c2, c3 = st.columns([1.4, 1.4, 4.2])
-with c1:
-    if st.button("⚡ Simulate Behavioural Shift"):
-        st.session_state.simulated = True
-        st.session_state.history = [12, 11, 13, 10, 12, 11, 18, 34, 57, 73, 87]
-        st.rerun()
-with c2:
-    if st.button("↺ Reset Baseline"):
-        st.session_state.simulated = False
-        st.session_state.history = [12, 11, 13, 10, 12, 11]
-        st.rerun()
-with c3:
-    st.markdown(
-        '<div class="small" style="padding:10px 0 0 10px;">'
-        'Safe demo mode: all telemetry is synthetic and generated inside the application.'
-        '</div>',
-        unsafe_allow_html=True
-    )
+event = safe_event(st.session_state.incident)
+risk, anomaly, confidence, reasons, volume_ratio, conn_ratio = analyze(event)
+st.session_state.last_risk = risk
 
-event = get_event(st.session_state.simulated)
-anomaly, threat, context, risk, volume_ratio, connection_ratio = score_event(event)
+state = "HIGH RISK" if risk >= 70 else ("ELEVATED" if risk >= 35 else "NORMAL")
+state_color = "#ff6878" if risk >= 70 else ("#ffc857" if risk >= 35 else "#5fe5ae")
 
-status = "HIGH RISK" if risk >= 70 else ("MEDIUM" if risk >= 35 else "NORMAL")
-status_class = "status-high" if risk >= 70 else "status-normal"
-
-# ---------- Metrics ----------
-m1, m2, m3, m4 = st.columns(4)
-for col, label, value, suffix in [
-    (m1, "Risk Score", f"{risk:.0f}", "/100"),
-    (m2, "Anomaly Score", f"{anomaly:.0f}", "%"),
-    (m3, "Threat Confidence", f"{threat:.0f}", "%"),
-    (m4, "Behaviour State", status, ""),
-]:
-    with col:
-        col.markdown(
-            f'<div class="metric"><div class="label">{label}</div>'
-            f'<div class="value">{value}<span style="font-size:16px;color:#8ea9cf">{suffix}</span></div></div>',
+# ---------------------- KPI row --------------------------------
+cols = st.columns(5)
+kpis = [
+    ("RISK SCORE", f"{risk:.0f}/100", "Real-time decision score"),
+    ("ANOMALY", f"{anomaly:.0f}%", "Deviation from baseline"),
+    ("CONFIDENCE", f"{confidence:.0f}%", "Model + context confidence"),
+    ("NOVEL SIGNALS", str(event["new_destinations"]), "New destinations observed"),
+    ("STATE", state, "Current behavioural state"),
+]
+for c, (label, value, sub) in zip(cols, kpis):
+    with c:
+        st.markdown(
+            f'<div class="card"><div class="card-title">{label}</div>'
+            f'<div class="metric-value" style="color:{state_color if label=="STATE" else "#edf5ff"}">{value}</div>'
+            f'<div class="muted">{sub}</div></div>',
             unsafe_allow_html=True
         )
 
 st.write("")
 
-# ---------- Main panels ----------
-left, right = st.columns([1.65, 1])
+# ---------------------- Navigation -----------------------------
+tab1, tab2, tab3, tab4 = st.tabs([
+    "🎯 SOC COMMAND CENTER",
+    "🧠 AI EXPLAINABILITY",
+    "🔬 DETECTION ENGINE",
+    "📋 INCIDENT REPORT"
+])
 
-with left:
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
-    st.subheader("📈 Behavioural Risk Timeline")
-    hist = st.session_state.history
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=list(range(1, len(hist)+1)),
-        y=hist,
-        mode="lines+markers",
-        line=dict(width=3, color="#00e5ff"),
-        marker=dict(size=7, color="#00e5ff"),
-        fill="tozeroy",
-        fillcolor="rgba(0,229,255,0.08)"
-    ))
-    fig.add_hline(y=70, line_dash="dash", line_color="#ff4c5b",
-                  annotation_text="HIGH-RISK THRESHOLD")
-    fig.update_layout(
-        height=310, margin=dict(l=10,r=10,t=10,b=10),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="#b9cbe7"),
-        xaxis=dict(title="Event sequence", gridcolor="#1a3155"),
-        yaxis=dict(title="Risk", range=[0,100], gridcolor="#1a3155"),
-        showlegend=False
-    )
-    st.plotly_chart(fig, use_container_width=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+# ======================== TAB 1 ================================
+with tab1:
+    left, right = st.columns([1.65, 1])
 
-with right:
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
-    st.subheader("🔎 Why did SENTINEL-X flag this?")
-    evidence = []
-    if volume_ratio >= 2.5:
-        evidence.append(f"Outbound traffic is {volume_ratio:.1f}× above baseline.")
-    else:
-        evidence.append("Outbound traffic remains near the learned baseline.")
-    if event["new_destinations"] >= 4:
-        evidence.append("Previously unseen destination pattern detected.")
-    else:
-        evidence.append("Destination behaviour is within the expected range.")
-    if connection_ratio >= 2:
-        evidence.append("Connection burst is significantly above baseline.")
-    else:
-        evidence.append("Connection rate is within expected range.")
-    if event["device_changed"]:
-        evidence.append("Identity/device context changed during the event.")
-    else:
-        evidence.append("Identity/device context matches the expected profile.")
-    for e in evidence:
-        st.markdown(f'<div class="evidence">✓ {e}</div>', unsafe_allow_html=True)
+    with left:
+        st.markdown('<div class="section-title">Behavioural risk evolution</div>', unsafe_allow_html=True)
+        st.markdown('<div class="muted">The detector watches deviation, not a fixed attack signature.</div>', unsafe_allow_html=True)
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            y=st.session_state.history,
+            x=list(range(1, len(st.session_state.history)+1)),
+            mode="lines+markers",
+            line=dict(color="#00e5ff", width=3),
+            marker=dict(color="#00e5ff", size=7),
+            fill="tozeroy",
+            fillcolor="rgba(0,229,255,.07)"
+        ))
+        fig.add_hline(y=70, line_dash="dash", line_color="#ff6878",
+                      annotation_text="HIGH-RISK")
+        fig.update_layout(
+            height=350, margin=dict(l=0,r=0,t=15,b=0),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="#9db4d4"),
+            xaxis=dict(title="Event sequence", gridcolor="#172e50"),
+            yaxis=dict(title="Risk score", range=[0,100], gridcolor="#172e50"),
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
-    st.markdown(
-        f'<p style="margin-top:14px">Decision: <span class="{status_class}">{status}</span></p>',
-        unsafe_allow_html=True
-    )
-    st.markdown('</div>', unsafe_allow_html=True)
+    with right:
+        if risk >= 70:
+            st.markdown(f"""
+            <div class="alert">
+              <div class="alert-title">🔴 HIGH-RISK BEHAVIOUR DETECTED</div>
+              <div style="margin-top:6px;color:#c7d6ea">
+                Multiple behavioural signals jointly exceed the learned profile.
+                This is a detection decision, not proof of compromise.
+              </div>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div class="ok">
+              <div class="ok-title">🟢 BASELINE BEHAVIOUR</div>
+              <div style="margin-top:6px;color:#b9d8ce">
+                Current telemetry remains consistent with the learned profile.
+              </div>
+            </div>
+            """, unsafe_allow_html=True)
 
-st.write("")
-
-# ---------- Telemetry + recommendation ----------
-a, b = st.columns(2)
-with a:
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
-    st.subheader("📡 Live Telemetry")
-    telemetry = pd.DataFrame({
-        "Signal": [
-            "Outbound traffic",
-            "Connection rate",
-            "New destinations",
-            "Device context"
-        ],
-        "Current": [
-            f"{event['outbound_mb']:.1f} MB",
-            f"{event['connections']:.0f}",
-            str(event["new_destinations"]),
-            "CHANGED" if event["device_changed"] else "EXPECTED"
-        ],
-        "Baseline": [
-            f"{baseline['outbound_mb']:.1f} MB",
-            f"{baseline['connections']:.0f}",
-            "~1",
-            "EXPECTED"
+        st.markdown("#### Detection chain")
+        chain = [
+            ("01","COLLECT","Synthetic cloud/network telemetry"),
+            ("02","BASELINE","Learn normal behavioural profile"),
+            ("03","DETECT","Isolation Forest anomaly scoring"),
+            ("04","CORRELATE","Contextual risk enrichment"),
+            ("05","EXPLAIN","Human-readable evidence"),
         ]
-    })
-    st.dataframe(telemetry, use_container_width=True, hide_index=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+        for n, name, desc in chain:
+            st.markdown(
+                f'<div class="step"><span class="step-num">{n}</span>'
+                f'<div class="step-name">{name}</div><div class="step-desc">{desc}</div></div>',
+                unsafe_allow_html=True
+            )
 
-with b:
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
-    st.subheader("🤖 Recommended Response")
+    st.write("")
+    a,b,c = st.columns(3)
+    with a:
+        st.markdown(f'<div class="card"><div class="card-title">OUTBOUND TRAFFIC</div><div class="metric-value">{event["outbound_mb"]:.1f} MB</div><div class="muted">Baseline: {baseline["outbound_mb"]:.1f} MB</div></div>', unsafe_allow_html=True)
+    with b:
+        st.markdown(f'<div class="card"><div class="card-title">CONNECTION RATE</div><div class="metric-value">{event["connections"]:.0f}</div><div class="muted">Baseline: {baseline["connections"]:.0f}</div></div>', unsafe_allow_html=True)
+    with c:
+        st.markdown(f'<div class="card"><div class="card-title">IDENTITY CONTEXT</div><div class="metric-value">{("CHANGED" if event["new_device"] else "EXPECTED")}</div><div class="muted">Device + geography context</div></div>', unsafe_allow_html=True)
+
+# ======================== TAB 2 ================================
+with tab2:
+    st.markdown('<div class="section-title">Why did the AI flag this?</div>', unsafe_allow_html=True)
+    st.markdown('<div class="muted">SENTINEL-X exposes the evidence behind its score instead of returning a black-box alert.</div>', unsafe_allow_html=True)
+    st.write("")
+    l,r = st.columns([1.1,1])
+
+    with l:
+        reason_df = pd.DataFrame({
+            "Signal": ["Traffic deviation","Connection burst","Destination novelty","Identity context","Geo context"],
+            "Contribution": [
+                max(0, volume_ratio*22),
+                max(0, conn_ratio*18),
+                event["new_destinations"]*6,
+                15 if event["new_device"] else 0,
+                12 if event["geo_shift"] else 0,
+            ]
+        })
+        fig2 = px.bar(reason_df, x="Contribution", y="Signal", orientation="h",
+                      text="Contribution")
+        fig2.update_traces(marker_color="#00e5ff", texttemplate="%{text:.0f}")
+        fig2.update_layout(height=340, margin=dict(l=0,r=0,t=10,b=0),
+                           paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                           font=dict(color="#9db4d4"), xaxis_title="Relative evidence",
+                           yaxis_title="", showlegend=False)
+        st.plotly_chart(fig2, use_container_width=True)
+
+    with r:
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.markdown("#### Evidence collected")
+        for reason in reasons:
+            st.markdown(f'<div class="step" style="margin:7px 0">✓ {reason}</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# ======================== TAB 3 ================================
+with tab3:
+    st.markdown('<div class="section-title">Detection engine</div>', unsafe_allow_html=True)
+    st.markdown('<div class="muted">A lightweight unsupervised model demonstrates detection of behavioural novelty without relying on a hard-coded attack signature.</div>', unsafe_allow_html=True)
+    st.write("")
+    l,r = st.columns(2)
+
+    with l:
+        engine_df = pd.DataFrame({
+            "Component": ["Telemetry ingestion","Behaviour baseline","Isolation Forest","Context enrichment","Explainability"],
+            "Status": ["ONLINE","LOADED","ONLINE","ONLINE","ONLINE"],
+            "Purpose": [
+                "Normalised event features",
+                "Median profile of normal activity",
+                "Unsupervised anomaly score",
+                "Identity + novelty context",
+                "Evidence for analyst review"
+            ]
+        })
+        st.dataframe(engine_df, use_container_width=True, hide_index=True)
+
+    with r:
+        radar = go.Figure(go.Scatterpolar(
+            r=[min(100, anomaly+5), min(100, confidence), min(100, event["new_destinations"]*9),
+               85 if event["new_device"] else 20, 78 if event["geo_shift"] else 15],
+            theta=["Anomaly","Confidence","Novelty","Identity","Geo"],
+            fill="toself",
+            line=dict(color="#00e5ff")
+        ))
+        radar.update_layout(
+            height=340, margin=dict(l=30,r=30,t=20,b=20),
+            paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#9db4d4"),
+            polar=dict(bgcolor="rgba(0,0,0,0)",
+                       radialaxis=dict(range=[0,100], gridcolor="#203b5e"),
+                       angularaxis=dict(gridcolor="#203b5e")),
+            showlegend=False
+        )
+        st.plotly_chart(radar, use_container_width=True)
+
+# ======================== TAB 4 ================================
+with tab4:
+    st.markdown('<div class="section-title">Analyst-ready incident report</div>', unsafe_allow_html=True)
+    st.markdown('<div class="muted">Generated from the current synthetic event for the hackathon demonstration.</div>', unsafe_allow_html=True)
+    st.write("")
+    report = pd.DataFrame([
+        ["Incident ID","SX-DEMO-2026-001"],
+        ["Detection state",state],
+        ["Risk score",f"{risk:.0f}/100"],
+        ["Anomaly score",f"{anomaly:.0f}%"],
+        ["Threat confidence",f"{confidence:.0f}%"],
+        ["Outbound traffic",f"{event['outbound_mb']:.1f} MB"],
+        ["New destinations",str(event["new_destinations"])],
+        ["Device context","Changed" if event["new_device"] else "Expected"],
+        ["Geographic context","Changed" if event["geo_shift"] else "Expected"],
+    ], columns=["Field","Value"])
+    st.dataframe(report, use_container_width=True, hide_index=True)
+
     if risk >= 70:
-        recommendation = "INVESTIGATE + CONTROLLED CONTAINMENT"
-        detail = "Escalate to an analyst, preserve evidence and consider isolating the affected workload after human approval."
-    elif risk >= 35:
-        recommendation = "INVESTIGATE"
-        detail = "Collect more context and monitor the workload for continued deviation."
+        st.warning("Recommended action: escalate for analyst validation, preserve evidence, and consider controlled containment after human approval.")
     else:
-        recommendation = "MONITOR"
-        detail = "No immediate containment recommended; continue baseline monitoring."
-    st.markdown(f"### {recommendation}")
-    st.write(detail)
-    st.caption("SENTINEL-X separates detection from response. High-risk scores do not automatically execute destructive actions.")
-    st.markdown('</div>', unsafe_allow_html=True)
+        st.success("Recommended action: continue monitoring; no immediate containment is recommended.")
 
 st.write("")
-st.caption("SENTINEL-X • Explainable behavioural anomaly detection • Hackathon demonstration • Synthetic telemetry only")
+st.markdown(
+    '<div style="text-align:center;color:#617999;font-size:11px;padding:15px">'
+    'SENTINEL-X • Defensive AI prototype • Synthetic telemetry • Human-in-the-loop response'
+    '</div>',
+    unsafe_allow_html=True
+)
